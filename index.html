@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pragati - Gemini AI Voice Assistant</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 25px;
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 22px;
+            color: #38bdf8;
+        }
+        .api-box {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 8px;
+        }
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: white;
+            font-size: 14px;
+        }
+        button.save-btn {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: none;
+            background: #0284c7;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #mic-btn {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            font-size: 34px;
+            cursor: pointer;
+            margin: 15px 0;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.5);
+            transition: transform 0.2s;
+        }
+        #mic-btn.listening {
+            background: #10b981;
+            animation: pulse 1.2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+        #status {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 15px;
+        }
+        .box {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 12px;
+            text-align: left;
+            font-size: 15px;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .label {
+            font-size: 12px;
+            color: #38bdf8;
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+            text-transform: uppercase;
+        }
+        .controls {
+            margin-top: 15px;
+        }
+        .stop-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>✨ Pragati Gemini AI</h1>
+    
+    <div class="api-box">
+        <input type="password" id="api-key-input" placeholder="Paste your Gemini API Key here...">
+        <button class="save-btn" onclick="saveKey()">Save</button>
+    </div>
+
+    <button id="mic-btn">🎤</button>
+    <div id="status">Tap the mic and ask anything in English</div>
+
+    <div class="box">
+        <span class="label">You asked:</span>
+        <div id="user-text">...</div>
+    </div>
+
+    <div class="box">
+        <span class="label">Gemini AI Response:</span>
+        <div id="ai-text">...</div>
+    </div>
+
+    <div class="controls">
+        <button class="stop-btn" onclick="stopSpeaking()">⏹ Stop Voice</button>
+    </div>
+</div>
+
+<script>
+    const micBtn = document.getElementById('mic-btn');
+    const statusText = document.getElementById('status');
+    const userText = document.getElementById('user-text');
+    const aiText = document.getElementById('ai-text');
+    const apiKeyInput = document.getElementById('api-key-input');
+
+    window.onload = () => {
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) {
+            apiKeyInput.value = savedKey;
+        }
+    };
+
+    function saveKey() {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            alert("API Key saved successfully!");
+        } else {
+            alert("Please enter a valid API Key.");
+        }
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        statusText.innerText = "Browser not supported. Please use Google Chrome.";
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        micBtn.addEventListener('click', () => {
+            const key = localStorage.getItem('gemini_api_key');
+            if (!key) {
+                alert("Please paste and save your Gemini API Key first!");
+                return;
+            }
+            window.speechSynthesis.cancel();
+            try {
+                recognition.start();
+            } catch (e) {
+                recognition.stop();
+            }
+        });
+
+        recognition.onstart = () => {
+            micBtn.classList.add('listening');
+            statusText.innerText = "Listening... Speak in English";
+        };
+
+        recognition.onspeechend = () => {
+            micBtn.classList.remove('listening');
+            statusText.innerText = "Thinking...";
+            recognition.stop();
+        };
+
+        recognition.onresult = (event) => {
+            const resultItem = event.results.item(0);
+            const alternative = resultItem.item(0);
+            const transcript = alternative.transcript;
+            userText.innerText = transcript;
+            askGemini(transcript);
+        };
+
+        recognition.onerror = (event) => {
+            micBtn.classList.remove('listening');
+            statusText.innerText = "Error: " + event.error + " (Allow mic permission)";
+        };
+    }
+
+    async function askGemini(promptText) {
+        const apiKey = localStorage.getItem('gemini_api_key');
+        const url = `https://googleapis.com{apiKey}`;
+
+        const payload = {
+            contents: [
+                {
+                    parts: [
+                        { text: "Answer concisely in plain English without markdown symbols like * or #: " + promptText }
+                    ]
+                }
+            ]
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                aiText.innerText = "API Error: " + data.error.message;
+                statusText.innerText = "Error occurred";
+                return;
+            }
+
+            const firstCandidate = data.candidates ? data.candidates.at(0) : null;
+            const firstPart = firstCandidate && firstCandidate.content && firstCandidate.content.parts ? firstCandidate.content.parts.at(0) : null;
+
+            if (firstPart && firstPart.text) {
+                const reply = firstPart.text;
+                aiText.innerText = reply;
+                speak(reply);
+            } else {
+                aiText.innerText = "No response received from AI.";
+                statusText.innerText = "Try again";
+            }
+
+        } catch (error) {
+            aiText.innerText = "Network error. Please check your internet connection.";
+            statusText.innerText = "Failed";
+        }
+    }
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        const speech = new SpeechSynthesisUtterance(text);
+        speech.lang = 'en-US';
+        speech.rate = 1.0;
+        speech.onend = () => {
+            statusText.innerText = "Tap the mic to ask again";
+        };
+        window.speechSynthesis.speak(speech);
+        statusText.innerText = "Speaking...";
+    }
+
+    function stopSpeaking() {
+        window.speechSynthesis.cancel();
+        statusText.innerText = "Stopped. Tap mic to speak.";
+    }
+</script>
+
+</body>
+</html>
